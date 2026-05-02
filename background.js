@@ -63,10 +63,25 @@ browser.contextMenus.create({
   contexts: ["selection"]
 });
 
-browser.contextMenus.onClicked.addListener((info) => {
+browser.contextMenus.onClicked.addListener((info, sourceTab) => {
   if (info.menuItemId === "translateSelection") {
-    browser.storage.local.set({ selectedText: info.selectionText });
+    const pageUrl = sourceTab?.url || "unknown";
+    browser.storage.local.set({
+      selectedText: info.selectionText,
+      pageUrl: pageUrl,
+      popupOpenTime: Date.now()
+    });
+
+    // Open sidebar for persistent window
+    browser.sidebarAction.open().catch(() => {
+      browser.browserAction.openPopup();
+    });
   }
+});
+
+// Handle sidebar registration
+browser.runtime.onStartup.addListener(() => {
+  browser.storage.sync.set({ serverUrl: "http://localhost:8080" });
 });
 
 browser.runtime.onInstalled.addListener(() => {
