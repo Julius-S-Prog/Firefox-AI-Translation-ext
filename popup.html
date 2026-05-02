@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>AI Translator</h1>
+    
+    <div class="settings-row">
+      <label for="targetLang">Translate to:</label>
+      <select id="targetLang">
+        <option value="English">English</option>
+        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+        <option value="Chinese (Traditional)">Chinese (Traditional)</option>
+        <option value="Japanese">Japanese</option>
+        <option value="Korean">Korean</option>
+        <option value="French">French</option>
+        <option value="German">German</option>
+        <option value="Spanish">Spanish</option>
+        <option value="Russian">Russian</option>
+        <option value="Arabic">Arabic</option>
+        <option value="Portuguese">Portuguese</option>
+        <option value="Italian">Italian</option>
+      </select>
+    </div>
+
+    <div class="input-section">
+      <label>Original Text:</label>
+      <textarea id="sourceText" readonly placeholder="Select text on a page, then click the extension icon..."></textarea>
+    </div>
+
+    <button id="translateBtn">Translate</button>
+
+    <div class="output-section">
+      <label>Translation:</label>
+      <div id="translation" class="translation-output">
+        <span class="placeholder">Translation will appear here</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="copyBtn" disabled>Copy Translation</button>
+      <button id="settingsBtn">Server Settings</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
