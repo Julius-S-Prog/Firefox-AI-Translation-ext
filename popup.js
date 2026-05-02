@@ -19,8 +19,10 @@ document.addEventListener("DOMContentLoaded", () => {
   // Detect current site from storage (set by background when context menu clicked)
   function detectSite() {
     browser.storage.local.get(["pageUrl"], (result) => {
+      const pageUrl = result.pageUrl || "";
+      console.log("Popup detected pageUrl:", pageUrl);
       try {
-        const url = new URL(result.pageUrl || "");
+        const url = new URL(pageUrl);
         currentSiteKey = url.hostname;
         siteInfo.textContent = url.hostname;
       } catch (e) {
@@ -29,6 +31,26 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
   }
+
+  // Listen for storage changes (in case storage saves after popup loads)
+  browser.storage.local.onChanged.addListener((changes) => {
+    if (changes.pageUrl) {
+      const pageUrl = changes.pageUrl.newValue || "";
+      console.log("Storage changed pageUrl:", pageUrl);
+      try {
+        const url = new URL(pageUrl);
+        currentSiteKey = url.hostname;
+        siteInfo.textContent = url.hostname;
+      } catch (e) {
+        currentSiteKey = "browser";
+        siteInfo.textContent = "Browser";
+      }
+    }
+    if (changes.selectedText) {
+      sourceText.value = changes.selectedText.newValue || "";
+      updateCharCount();
+    }
+  });
 
   detectSite();
 

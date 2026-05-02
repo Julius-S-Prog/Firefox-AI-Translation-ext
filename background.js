@@ -63,18 +63,19 @@ browser.contextMenus.create({
   contexts: ["selection"]
 });
 
-browser.contextMenus.onClicked.addListener((info, sourceTab) => {
+browser.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "translateSelection") {
-    const pageUrl = sourceTab?.url || "unknown";
+    console.log("Context menu clicked, tab.url:", tab?.url);
+    console.log("info:", info);
     browser.storage.local.set({
       selectedText: info.selectionText,
-      pageUrl: pageUrl,
+      pageUrl: tab?.url || "unknown",
       popupOpenTime: Date.now()
-    });
-
-    // Open sidebar for persistent window
-    browser.sidebarAction.open().catch(() => {
-      browser.browserAction.openPopup();
+    }, () => {
+      console.log("Storage saved, now opening sidebar");
+      browser.sidebarAction.open().catch(() => {
+        browser.browserAction.openPopup();
+      });
     });
   }
 });

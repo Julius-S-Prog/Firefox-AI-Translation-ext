@@ -25,7 +25,6 @@
   "sidebar_action": {
     "default_title": "AI Translator",
     "default_panel": "popup.html",
-    "width": 420,
     "browser_style": false
   },
   "browser_action": {
