@@ -5,35 +5,16 @@ browser.runtime.onMessage.addListener((request, sender) => {
         const serverUrl = result.serverUrl || "http://localhost:8080";
         const model = result.model || "local-model";
 
-        const prompt = `Translate the following text to ${request.targetLang}. Only output the translation, nothing else:
-
-${request.text}`;
+        const prompt = buildPrompt(request.text, request.targetLang);
+        const requestBody = buildRequestConfig(model, prompt, false);
 
         console.log("Sending request to:", `${serverUrl}/v1/chat/completions`);
-        console.log("Request body:", JSON.stringify({
-          model: model,
-          messages: [
-            { role: "system", content: "You are a professional translator." },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 2048,
-          stream: false
-        }));
+        console.log("Request body:", JSON.stringify(requestBody));
 
         fetch(`${serverUrl}/v1/chat/completions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              { role: "system", content: "You are a professional translator." },
-              { role: "user", content: prompt }
-            ],
-            temperature: 0.3,
-            max_tokens: 2048,
-            stream: false
-          })
+          body: JSON.stringify(requestBody)
         })
           .then((res) => {
             console.log("Response status:", res.status);

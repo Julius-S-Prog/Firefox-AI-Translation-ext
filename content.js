@@ -1,6 +1,3 @@
-const DEFAULT_SERVER_URL = "http://localhost:8080";
-const DEFAULT_MODEL = "local-model";
-
 function getServerUrl() {
   return new Promise((resolve) => {
     chrome.storage.sync.get(["serverUrl"], (result) => {
@@ -21,25 +18,10 @@ async function translateText(text, targetLang) {
   const serverUrl = await getServerUrl();
   const model = await getModel();
 
-  const prompt = `Translate the following text to ${targetLang}. Only output the translation, nothing else:
-
-${text}`;
-
   const response = await fetch(`${serverUrl}/v1/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "system", content: "You are a professional translator." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 2048,
-      stream: false
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildRequestConfig(model, buildPrompt(text, targetLang), false))
   });
 
   if (!response.ok) {
@@ -54,25 +36,10 @@ async function translateTextStream(text, targetLang, onChunk, onDone, onError) {
   const serverUrl = await getServerUrl();
   const model = await getModel();
 
-  const prompt = `Translate the following text to ${targetLang}. Only output the translation, nothing else:
-
-${text}`;
-
   const response = await fetch(`${serverUrl}/v1/chat/completions`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: model,
-      messages: [
-        { role: "system", content: "You are a professional translator." },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.3,
-      max_tokens: 2048,
-      stream: true
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildRequestConfig(model, buildPrompt(text, targetLang), true))
   });
 
   if (!response.ok) {

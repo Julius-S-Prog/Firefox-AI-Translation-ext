@@ -14,12 +14,12 @@
     }
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["lib/shared.js", "background.js"]
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content.js"]
+      "js": ["lib/shared.js", "content.js"]
     }
   ],
   "sidebar_action": {

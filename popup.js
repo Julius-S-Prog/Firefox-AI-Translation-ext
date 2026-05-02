@@ -17,42 +17,23 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentSiteKey = "";
 
   // Detect current site from storage (set by background when context menu clicked)
-  function detectSite() {
-    browser.storage.local.get(["pageUrl"], (result) => {
-      const pageUrl = result.pageUrl || "";
-      console.log("Popup detected pageUrl:", pageUrl);
-      try {
-        const url = new URL(pageUrl);
-        currentSiteKey = url.hostname;
-        siteInfo.textContent = url.hostname;
-      } catch (e) {
-        currentSiteKey = "browser";
-        siteInfo.textContent = "Browser";
-      }
-    });
+  function updateSiteInfo(pageUrl) {
+    console.log("Popup detected pageUrl:", pageUrl);
+    const { hostname, label } = extractHostname(pageUrl || "");
+    currentSiteKey = hostname;
+    siteInfo.textContent = label;
   }
 
   // Listen for storage changes (in case storage saves after popup loads)
   browser.storage.local.onChanged.addListener((changes) => {
     if (changes.pageUrl) {
-      const pageUrl = changes.pageUrl.newValue || "";
-      console.log("Storage changed pageUrl:", pageUrl);
-      try {
-        const url = new URL(pageUrl);
-        currentSiteKey = url.hostname;
-        siteInfo.textContent = url.hostname;
-      } catch (e) {
-        currentSiteKey = "browser";
-        siteInfo.textContent = "Browser";
-      }
+      updateSiteInfo(changes.pageUrl.newValue);
     }
     if (changes.selectedText) {
       sourceText.value = changes.selectedText.newValue || "";
       updateCharCount();
     }
   });
-
-  detectSite();
 
   // Load theme
   function loadTheme() {
@@ -99,6 +80,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const TRANSLATE_BTN_HTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+        Translate
+      `;
+
+  const COPY_BTN_HTML = `
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copy
+        `;
+
+  function resetTranslateBtn() {
+    translateBtn.disabled = false;
+    translateBtn.innerHTML = TRANSLATE_BTN_HTML;
+  }
+
+  function resetCopyBtn() {
+    copyBtn.innerHTML = COPY_BTN_HTML;
+  }
+
   function escapeHtml(text) {
     const div = document.createElement("div");
     div.textContent = text;
@@ -130,14 +134,13 @@ document.addEventListener("DOMContentLoaded", () => {
       sourceText.value = result.selectedText;
       updateCharCount();
     }
-    if (!result.pageUrl) detectSite();
+    updateSiteInfo(result.pageUrl);
+    loadMemory();
   });
 
   browser.storage.sync.get(["targetLang"], (result) => {
     if (result.targetLang) targetLang.value = result.targetLang;
   });
-
-  loadMemory();
 
   // Translate
   translateBtn.addEventListener("click", () => {
@@ -154,13 +157,7 @@ document.addEventListener("DOMContentLoaded", () => {
       text: text,
       targetLang: targetLang.value
     }).then((response) => {
-      translateBtn.disabled = false;
-      translateBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-        </svg>
-        Translate
-      `;
+      resetTranslateBtn();
 
       if (response.error) {
         throw new Error(response.error);
@@ -170,13 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
       copyBtn.disabled = false;
       saveMemory(text, translatedText);
     }).catch((error) => {
-      translateBtn.disabled = false;
-      translateBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-        </svg>
-        Translate
-      `;
+      resetTranslateBtn();
       translation.innerHTML = `<span style="color: var(--danger);">${error.message || "Translation failed"}</span>`;
     });
   });
@@ -191,14 +182,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </svg>
         Copied!
       `;
-      setTimeout(() => {
-        copyBtn.innerHTML = `
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-          </svg>
-          Copy
-        `;
-      }, 1500);
+      setTimeout(resetCopyBtn, 1500);
     });
   });
 

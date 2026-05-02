@@ -5,8 +5,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const status = document.getElementById("status");
 
   browser.storage.sync.get(["serverUrl", "model"], (result) => {
-    serverUrl.value = result.serverUrl || "http://localhost:8080";
-    model.value = result.model || "local-model";
+    serverUrl.value = result.serverUrl || DEFAULT_SERVER_URL;
+    model.value = result.model || DEFAULT_MODEL;
   });
 
   saveBtn.addEventListener("click", () => {
