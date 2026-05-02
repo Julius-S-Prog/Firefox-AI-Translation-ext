@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const sourceText = document.getElementById("sourceText");
   const translation = document.getElementById("translation");
   const translateBtn = document.getElementById("translateBtn");
+  const translatePageBtn = document.getElementById("translatePageBtn");
   const copyBtn = document.getElementById("copyBtn");
   const settingsBtn = document.getElementById("settingsBtn");
   const targetLang = document.getElementById("targetLang");
@@ -12,22 +13,55 @@ document.addEventListener("DOMContentLoaded", () => {
   const memoryCount = document.getElementById("memoryCount");
   const clearMemoryBtn = document.getElementById("clearMemory");
   const charCount = document.getElementById("charCount");
+  const resetPageBtn = document.getElementById("resetPageBtn");
 
   let translatedText = "";
   let currentSiteKey = "";
 
-  // Detect current site from storage (set by background when context menu clicked)
-  function updateSiteInfo(pageUrl) {
+  // Get current tab URL from browser API
+  async function getCurrentTabUrl() {
+    return new Promise((resolve) => {
+      browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].url) {
+          resolve(tabs[0].url);
+        } else {
+          resolve("");
+        }
+      });
+    });
+  }
+
+  // Detect current site from tab or storage
+  async function updateSiteInfo() {
+    let pageUrl = "";
+
+    // First try storage (set by context menu)
+    const stored = await new Promise((resolve) => {
+      browser.storage.local.get(["pageUrl"], (result) => resolve(result.pageUrl || ""));
+    });
+    if (stored) {
+      pageUrl = stored;
+    }
+
+    // Also try current tab
+    const tabUrl = await getCurrentTabUrl();
+    if (tabUrl && tabUrl !== "about:blank" && tabUrl !== "about:srcdoc") {
+      pageUrl = tabUrl;
+    }
+
     console.log("Popup detected pageUrl:", pageUrl);
-    const { hostname, label } = extractHostname(pageUrl || "");
+    const { hostname, label } = extractHostname(pageUrl);
     currentSiteKey = hostname;
     siteInfo.textContent = label;
+
+    const showPageTranslate = hostname && hostname !== "browser" && !hostname.startsWith("about:");
+    translatePageBtn.style.display = showPageTranslate ? "flex" : "none";
   }
 
   // Listen for storage changes (in case storage saves after popup loads)
   browser.storage.local.onChanged.addListener((changes) => {
     if (changes.pageUrl) {
-      updateSiteInfo(changes.pageUrl.newValue);
+      updateSiteInfo();
     }
     if (changes.selectedText) {
       sourceText.value = changes.selectedText.newValue || "";
@@ -129,12 +163,14 @@ document.addEventListener("DOMContentLoaded", () => {
   sourceText.addEventListener("input", updateCharCount);
 
   // Load initial data
-  browser.storage.local.get(["selectedText", "pageUrl"], (result) => {
-    if (result.selectedText) {
-      sourceText.value = result.selectedText;
+  updateSiteInfo().then(async () => {
+    const stored = await new Promise((resolve) => {
+      browser.storage.local.get(["selectedText", "pageUrl"], (result) => resolve(result));
+    });
+    if (stored.selectedText) {
+      sourceText.value = stored.selectedText;
       updateCharCount();
     }
-    updateSiteInfo(result.pageUrl);
     loadMemory();
   });
 
@@ -170,6 +206,45 @@ document.addEventListener("DOMContentLoaded", () => {
       resetTranslateBtn();
       translation.innerHTML = `<span style="color: var(--danger);">${error.message || "Translation failed"}</span>`;
     });
+  });
+
+  // Translate Page
+  translatePageBtn.addEventListener("click", () => {
+    translatePageBtn.disabled = true;
+    translatePageBtn.textContent = "Translating...";
+    browser.runtime.sendMessage({
+      action: "translatePage",
+      targetLang: targetLang.value
+    }).then((response) => {
+      translatePageBtn.disabled = false;
+      translatePageBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Translate Page
+      `;
+      if (response && response.error) {
+        alert("Translation failed: " + response.error);
+      }
+      if (response && response.success === true) {
+        resetPageBtn.style.display = "inline-flex";
+      }
+    }).catch((err) => {
+      translatePageBtn.disabled = false;
+      translatePageBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+        Translate Page
+      `;
+      alert("Translation failed: " + err.message);
+    });
+  });
+
+  // Reset page translation
+  resetPageBtn.addEventListener("click", () => {
+    browser.runtime.sendMessage({ action: "resetPageTranslation" });
+    resetPageBtn.style.display = "none";
   });
 
   // Copy

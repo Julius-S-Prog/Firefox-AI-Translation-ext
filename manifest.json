@@ -5,7 +5,8 @@
   "description": "Translate selected text using local llama.cpp AI",
   "permissions": [
     "storage",
-    "contextMenus"
+    "contextMenus",
+    "tabs"
   ],
   "browser_specific_settings": {
     "gecko": {
