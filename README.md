@@ -1,0 +1,1 @@
+# Firefox-AI-Translation-ext
