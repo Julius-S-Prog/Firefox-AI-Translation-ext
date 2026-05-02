@@ -65,18 +65,14 @@ browser.contextMenus.create({
 
 browser.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === "translateSelection") {
-    console.log("Context menu clicked, tab.url:", tab?.url);
-    console.log("info:", info);
     browser.storage.local.set({
       selectedText: info.selectionText,
       pageUrl: tab?.url || "unknown",
       popupOpenTime: Date.now()
-    }, () => {
-      console.log("Storage saved, now opening sidebar");
-      browser.sidebarAction.open().catch(() => {
-        browser.browserAction.openPopup();
-      });
     });
+
+    // Always open sidebar for persistent window
+    browser.sidebarAction.open();
   }
 });
 
