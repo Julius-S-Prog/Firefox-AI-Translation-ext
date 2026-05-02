@@ -92,20 +92,18 @@ const SKIP_ATTRIBUTES = ["translate", "data-no-translate", "data-translate-skip"
 
 function translatePage(targetLang) {
   return new Promise((resolve, reject) => {
-    const allTextNodes = [];
+    const translatableElements = [];
     const walker = document.createTreeWalker(
       document.body,
-      NodeFilter.SHOW_TEXT,
+      NodeFilter.SHOW_ELEMENT,
       {
         acceptNode(node) {
-          const parent = node.parentElement;
-          if (!parent) return NodeFilter.FILTER_REJECT;
-          if (SKIP_TAGS.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
-          if (parent.closest(SKIP_ATTRIBUTES.join(","))) return NodeFilter.FILTER_REJECT;
+          if (SKIP_TAGS.has(node.tagName)) return NodeFilter.FILTER_REJECT;
+          if (node.closest("[translate='no']")) return NodeFilter.FILTER_REJECT;
+          if (node.closest("[data-no-translate]")) return NodeFilter.FILTER_REJECT;
           for (const attr of SKIP_ATTRIBUTES) {
-            if (parent.hasAttribute(attr) && parent.getAttribute(attr) !== "false") return NodeFilter.FILTER_REJECT;
+            if (node.hasAttribute(attr) && node.getAttribute(attr) !== "false") return NodeFilter.FILTER_REJECT;
           }
-          if (parent.closest("[translate='no']")) return NodeFilter.FILTER_REJECT;
           const text = node.textContent.trim();
           if (!text || text.length < 2) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
@@ -114,37 +112,33 @@ function translatePage(targetLang) {
     );
 
     while (walker.nextNode()) {
-      allTextNodes.push(walker.currentNode);
+      const el = walker.currentNode;
+      if (!el.dataset.original) {
+        el.dataset.original = el.textContent.trim();
+      }
+      translatableElements.push(el);
     }
 
-    if (allTextNodes.length === 0) {
+    if (translatableElements.length === 0) {
       resolve({ success: false, message: "No translatable text found" });
       return;
     }
 
-    const originalTexts = [];
-    for (const node of allTextNodes) {
-      if (!node.dataset.original) {
-        node.dataset.original = node.textContent;
-      }
-      originalTexts.push(node.textContent);
-    }
-
+    const originalTexts = translatableElements.map((el) => el.dataset.original);
     const fullText = originalTexts.join("\n");
-    const lines = [];
     let lineIndex = 0;
 
     translateTextStream(fullText, targetLang, (chunk) => {
       const translatedLines = chunk.trim().split("\n");
-      while (lineIndex < translatedLines.length && lineIndex < allTextNodes.length) {
+      while (lineIndex < translatedLines.length && lineIndex < translatableElements.length) {
         const translated = translatedLines[lineIndex].trim();
-        if (translated && allTextNodes[lineIndex]) {
-          allTextNodes[lineIndex].textContent = translated;
+        if (translated && translatableElements[lineIndex]) {
+          translatableElements[lineIndex].textContent = translated;
         }
         lineIndex++;
       }
     }, () => {
-      resolve({ success: true, count: allTextNodes.length });
+      resolve({ success: true, count: translatableElements.length });
     }, (err) => {
       reject(new Error(err));
     });
@@ -154,9 +148,7 @@ function translatePage(targetLang) {
 function resetPageTranslation() {
   const elements = document.querySelectorAll("[data-original]");
   for (const el of elements) {
-    if (el.dataset.original !== undefined) {
-      el.textContent = el.dataset.original;
-    }
+    el.textContent = el.dataset.original;
   }
 }
 

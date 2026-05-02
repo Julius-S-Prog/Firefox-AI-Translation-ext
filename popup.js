@@ -69,6 +69,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Listen for tab changes to update URL in sidebar
+  browser.tabs.onActivated.addListener(({ tabId }) => {
+    browser.tabs.get(tabId, (tab) => {
+      if (tab && tab.url) {
+        browser.storage.local.set({ pageUrl: tab.url });
+        updateSiteInfo();
+      }
+    });
+  });
+
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    if (changeInfo.status === "complete" || changeInfo.url) {
+      browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0] && tabs[0].id === tabId) {
+          browser.storage.local.set({ pageUrl: tabs[0].url || "" });
+          updateSiteInfo();
+        }
+      });
+    }
+  });
+
   // Load theme
   function loadTheme() {
     browser.storage.sync.get(["theme"], (result) => {
@@ -163,14 +184,13 @@ document.addEventListener("DOMContentLoaded", () => {
   sourceText.addEventListener("input", updateCharCount);
 
   // Load initial data
-  updateSiteInfo().then(async () => {
-    const stored = await new Promise((resolve) => {
-      browser.storage.local.get(["selectedText", "pageUrl"], (result) => resolve(result));
+  updateSiteInfo().then(() => {
+    browser.storage.local.get(["selectedText"], (result) => {
+      if (result.selectedText) {
+        sourceText.value = result.selectedText;
+        updateCharCount();
+      }
     });
-    if (stored.selectedText) {
-      sourceText.value = stored.selectedText;
-      updateCharCount();
-    }
     loadMemory();
   });
 
