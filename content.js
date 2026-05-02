@@ -1,98 +1,30 @@
-function getServerUrl() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(["serverUrl"], (result) => {
-      resolve(result.serverUrl || DEFAULT_SERVER_URL);
-    });
-  });
-}
-
-function getModel() {
-  return new Promise((resolve) => {
-    chrome.storage.sync.get(["model"], (result) => {
-      resolve(result.model || DEFAULT_MODEL);
-    });
-  });
-}
-
-async function translateText(text, targetLang) {
-  const serverUrl = await getServerUrl();
-  const model = await getModel();
-
-  const response = await fetch(`${serverUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildRequestConfig(model, buildPrompt(text, targetLang), false))
-  });
-
-  if (!response.ok) {
-    throw new Error(`Translation failed: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content.trim();
-}
-
-async function translateTextStream(text, targetLang, onChunk, onDone, onError) {
-  const serverUrl = await getServerUrl();
-  const model = await getModel();
-
-  const response = await fetch(`${serverUrl}/v1/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(buildRequestConfig(model, buildPrompt(text, targetLang), true))
-  });
-
-  if (!response.ok) {
-    onError(`Translation failed: ${response.statusText}`);
-    return;
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullText = "";
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop();
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") {
-            onDone(fullText);
-            return;
-          }
-          try {
-            const parsed = JSON.parse(data);
-            const chunk = parsed.choices[0]?.delta?.content || "";
-            if (chunk) {
-              fullText += chunk;
-              onChunk(fullText);
-            }
-          } catch (e) {
-            // skip malformed JSON
-          }
-        }
+function translateText(text, targetLang) {
+  return new Promise((resolve, reject) => {
+    browser.runtime.sendMessage({
+      action: "translate",
+      text: text,
+      targetLang: targetLang
+    }).then((response) => {
+      if (response && response.error) {
+        reject(new Error(response.error));
+      } else if (response && response.success) {
+        resolve(response.success);
+      } else {
+        reject(new Error("Translation failed: no response from server"));
       }
-    }
-    onDone(fullText);
-  } catch (e) {
-    onError(e.message);
-  }
+    }).catch((err) => {
+      reject(new Error("Translation failed: " + (err.message || "NetworkError when attempting to fetch resource")));
+    });
+  });
 }
 
-const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "SELECT", "BUTTON", "CODE", "PRE", "SVG", "IMG", "BR", "INPUT"]);
+const SKIP_TAGS = new Set(["SCRIPT", "STYLE", "TEXTAREA", "INPUT", "SELECT", "BUTTON", "CODE", "PRE", "SVG", "IMG", "BR"]);
 const SKIP_ATTRIBUTES = ["translate", "data-no-translate", "data-translate-skip"];
 
 function translatePage(targetLang) {
   return new Promise((resolve, reject) => {
     const translatableElements = [];
+    const texts = [];
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_ELEMENT,
@@ -117,6 +49,7 @@ function translatePage(targetLang) {
         el.dataset.original = el.textContent.trim();
       }
       translatableElements.push(el);
+      texts.push(el.dataset.original);
     }
 
     if (translatableElements.length === 0) {
@@ -124,23 +57,25 @@ function translatePage(targetLang) {
       return;
     }
 
-    const originalTexts = translatableElements.map((el) => el.dataset.original);
-    const fullText = originalTexts.join("\n");
-    let lineIndex = 0;
+    let completed = 0;
+    let errors = 0;
 
-    translateTextStream(fullText, targetLang, (chunk) => {
-      const translatedLines = chunk.trim().split("\n");
-      while (lineIndex < translatedLines.length && lineIndex < translatableElements.length) {
-        const translated = translatedLines[lineIndex].trim();
-        if (translated && translatableElements[lineIndex]) {
-          translatableElements[lineIndex].textContent = translated;
-        }
-        lineIndex++;
-      }
-    }, () => {
-      resolve({ success: true, count: translatableElements.length });
-    }, (err) => {
-      reject(new Error(err));
+    texts.forEach((text, index) => {
+      translateText(text, targetLang)
+        .then((translated) => {
+          if (translated && translated !== text) {
+            translatableElements[index].textContent = translated;
+          }
+          completed++;
+        })
+        .catch(() => {
+          errors++;
+        })
+        .finally(() => {
+          if (completed + errors === translatableElements.length) {
+            resolve({ success: true, count: completed, errors });
+          }
+        });
     });
   });
 }
