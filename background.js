@@ -33,14 +33,70 @@ browser.runtime.onMessage.addListener((request, sender) => {
     return new Promise((resolve) => {
       browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]) {
-          browser.tabs.sendMessage(tabs[0].id, {
-            action: "translatePage",
-            targetLang: request.targetLang
-          }).then((response) => {
-            if (response && response.success === true) {
-              browser.tabs.sendMessage(tabs[0].id, { action: "showResetBtn" });
-            }
-            resolve(response);
+          browser.storage.sync.get(["serverUrl", "model"], (result) => {
+            const serverUrl = result.serverUrl || "http://localhost:8080";
+            const model = result.model || "local-model";
+            browser.tabs.sendMessage(tabs[0].id, {
+              action: "translatePage",
+              targetLang: request.targetLang,
+              serverUrl: serverUrl,
+              model: model
+            }).then((response) => {
+              if (response && response.success === true) {
+                browser.tabs.sendMessage(tabs[0].id, { action: "showResetBtn" });
+              } else if (response && response.error) {
+                browser.tabs.sendMessage(tabs[0].id, { action: "showResetBtn" });
+              }
+              resolve(response);
+            }).catch((err) => {
+              resolve({ error: err.message });
+            });
+          });
+        } else {
+          resolve({ error: "No active tab found" });
+        }
+      });
+    });
+  }
+  if (request.action === "translatePageText") {
+    return new Promise((resolve) => {
+      const prompt = buildPrompt(request.text, request.targetLang);
+      const requestBody = buildRequestConfig(request.model, prompt, false);
+
+      fetch(`${request.serverUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody)
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`Server error: ${res.statusText}`);
+          return res.text();
+        })
+        .then((text) => {
+          const data = JSON.parse(text);
+          const content = data.choices?.[0]?.message?.content;
+          if (!content) throw new Error("No translation returned from model");
+          resolve({
+            action: "translatePageResponse",
+            index: request.index,
+            success: content.trim()
+          });
+        })
+        .catch((err) => {
+          resolve({
+            action: "translatePageResponse",
+            index: request.index,
+            error: err.message
+          });
+        });
+    });
+  }
+  if (request.action === "cancelPageTranslation") {
+    return new Promise((resolve) => {
+      browser.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          browser.tabs.sendMessage(tabs[0].id, { action: "cancelPageTranslation" }).then(() => {
+            resolve({ success: true });
           }).catch((err) => {
             resolve({ error: err.message });
           });

@@ -249,6 +249,34 @@ h1 {
   cursor: not-allowed;
 }
 
+.btn-danger {
+  width: 100%;
+  padding: 10px 16px;
+  background: var(--danger);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all var(--transition);
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.btn-danger:active {
+  transform: translateY(0);
+}
+
 .btn-small {
   padding: 5px 10px;
   background: var(--bg-tertiary);

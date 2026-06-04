@@ -14,6 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const clearMemoryBtn = document.getElementById("clearMemory");
   const charCount = document.getElementById("charCount");
   const resetPageBtn = document.getElementById("resetPageBtn");
+  const cancelPageBtn = document.getElementById("cancelPageBtn");
 
   let translatedText = "";
   let currentSiteKey = "";
@@ -242,13 +243,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Translate Page
   translatePageBtn.addEventListener("click", () => {
-    translatePageBtn.disabled = true;
-    translatePageBtn.textContent = "Translating...";
+    translatePageBtn.style.display = "none";
+    cancelPageBtn.style.display = "flex";
+    cancelPageBtn.disabled = false;
     browser.runtime.sendMessage({
       action: "translatePage",
       targetLang: targetLang.value
     }).then((response) => {
-      resetTranslatePageBtn();
+      cancelPageBtn.style.display = "none";
+      translatePageBtn.style.display = "flex";
+      translatePageBtn.disabled = false;
+      translatePageBtn.innerHTML = TRANSLATE_PAGE_BTN_HTML;
       if (response && response.error) {
         alert("Translation failed: " + response.error);
       }
@@ -256,8 +261,26 @@ document.addEventListener("DOMContentLoaded", () => {
         resetPageBtn.style.display = "inline-flex";
       }
     }).catch((err) => {
-      resetTranslatePageBtn();
+      cancelPageBtn.style.display = "none";
+      translatePageBtn.style.display = "flex";
+      translatePageBtn.disabled = false;
+      translatePageBtn.innerHTML = TRANSLATE_PAGE_BTN_HTML;
       alert("Translation failed: " + err.message);
+    });
+  });
+
+  // Cancel page translation
+  cancelPageBtn.addEventListener("click", () => {
+    browser.runtime.sendMessage({
+      action: "cancelPageTranslation"
+    }).then((response) => {
+      cancelPageBtn.style.display = "none";
+      translatePageBtn.style.display = "flex";
+      translatePageBtn.disabled = false;
+      translatePageBtn.innerHTML = TRANSLATE_PAGE_BTN_HTML;
+      resetPageBtn.style.display = "none";
+    }).catch((err) => {
+      alert("Failed to cancel: " + err.message);
     });
   });
 
